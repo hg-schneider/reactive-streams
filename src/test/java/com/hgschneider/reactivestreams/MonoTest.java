@@ -1,9 +1,7 @@
 package com.hgschneider.reactivestreams;
 
-import javax.management.RuntimeErrorException;
 
 import org.junit.jupiter.api.Test;
-import org.reactivestreams.Subscription;
 
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
@@ -11,13 +9,13 @@ import reactor.test.StepVerifier;
 
 // DevDojo Academy
 // Project Reactor Essentials
-// https://youtu.be/lCTUOERTXyw?si=s0HNtjhp3NabxUuJ
+// https://www.youtube.com/watch?v=lCTUOERTXyw&list=PL0Un1HNdB4jFCsHsQg2HOfO03XfECuMiw
 @Slf4j
-public class MonoTest {
+class MonoTest {
     private static final String MESSAGE = "Hello world!";
 
     @Test
-    public void monoSubscriber() {
+    void monoSubscriber() {
         Mono<String> mono = Mono.just(MESSAGE)
             .log();
         
@@ -29,7 +27,7 @@ public class MonoTest {
     }
 
     @Test
-    public void monoSubscriberConsumer() {
+    void monoSubscriberConsumer() {
         Mono<String> mono = Mono.just(MESSAGE)
             .log();
 
@@ -44,7 +42,7 @@ public class MonoTest {
     }
 
     @Test
-    public void monoSubscriberError() {
+    void monoSubscriberError() {
         Mono<String> mono = Mono.just(MESSAGE)
             .map(s -> { throw new RuntimeException("Testing error!"); });
             
@@ -60,7 +58,7 @@ public class MonoTest {
     }
 
     @Test
-    public void monoSubscriberConsumerComplete() {
+    void monoSubscriberConsumerComplete() {
         Mono<String> mono = Mono.just(MESSAGE)
             .log()
             .map(s -> s.toUpperCase());
@@ -77,7 +75,7 @@ public class MonoTest {
     }
 
     @Test
-    public void monoSubscriberConsumerSubscription() {
+    void monoSubscriberConsumerSubscription() {
         Mono<String> mono = Mono.just(MESSAGE)
             .log()
             .map(s -> s.toUpperCase());
@@ -95,7 +93,7 @@ public class MonoTest {
     }
 
     @Test
-    public void monoDoOnMethod() {
+    void monoDoOnMethod() {
         Mono<String> mono = Mono.just(MESSAGE)
             .log()
             .map(s -> s.toUpperCase())
@@ -116,5 +114,46 @@ public class MonoTest {
             .expectNextCount(0)
             .verifyComplete();
     }
-    //Next Chapter 07
+
+    @Test
+    void monoDoOnError() {
+        Mono<String> mono = Mono.<String>error(new IllegalArgumentException("Something Illegal."))
+            .doOnError(e -> log.error("Error!"))
+            .log();
+
+        StepVerifier.create(mono)
+            .expectError(IllegalArgumentException.class)
+            .verify();
+    }
+
+    @Test
+    void monoDoOnErrorResume() {
+        Mono<String> mono = Mono.<String>error(new IllegalArgumentException("Something Illegal."))
+            .doOnError(e -> log.error("Error!"))
+            .onErrorResume(s -> {
+                log.info("Inside on error resume.");
+                return(Mono.just("resuming"));
+            })
+            .log();
+
+        StepVerifier.create(mono)
+            .expectNext("resuming")
+            .verifyComplete();
+    }
+
+    @Test
+    void monoDoOnErrorReturn() {
+        Mono<String> mono = Mono.<String>error(new IllegalArgumentException("Something Illegal."))
+            .onErrorReturn("On error return")
+            .onErrorResume(s -> {
+                log.info("Inside on error resume.");
+                return(Mono.just("resuming"));
+            })
+            .doOnError(e -> log.error("Error!"))
+            .log();
+
+        StepVerifier.create(mono)
+            .expectNext("On error return")
+            .verifyComplete();
+    }
 }
