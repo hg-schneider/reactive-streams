@@ -2,7 +2,6 @@ package com.hgschneider.reactivestreams;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.junit.jupiter.api.Test;
@@ -165,7 +164,7 @@ class FluxTest {
     }
 
     @Test
-    void fluxSubscriberIntervalTwo() throws InterruptedException {
+    void fluxSubscriberIntervalTwo() {
         Supplier<Flux<Long>> createInterval = () -> Flux.interval(Duration.ofDays(1)).log();
 
         StepVerifier.withVirtualTime(createInterval)
