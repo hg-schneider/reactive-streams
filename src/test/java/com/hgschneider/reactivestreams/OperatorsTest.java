@@ -1,30 +1,58 @@
-package com;
+package com.hgschneider.reactivestreams;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicLongFieldUpdater;
-import java.util.stream.Collectors;
+import java.util.function.Function;
+
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 import lombok.extern.slf4j.Slf4j;
+import reactor.blockhound.BlockHound;
+import reactor.blockhound.BlockingOperationError;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 import reactor.test.StepVerifier;
-import reactor.test.StepVerifier.Step;
+
+// DevDojo Academy
+// Project Reactor Essentials
+// https://www.youtube.com/watch?v=lCTUOERTXyw&list=PL0Un1HNdB4jFCsHsQg2HOfO03XfECuMiw
+
+// BlockHound
 
 @Slf4j
-public class OperatorsTest {
+class OperatorsTest {
     
+    @BeforeAll
+    static void setUp() {
+        BlockHound.install();
+    }
+
+    @Test 
+    void blockHoundworks() {
+        try {
+            FutureTask<?> task = new FutureTask<>(() -> {
+                Thread.sleep(0);
+                return "";
+            });
+            Schedulers.parallel().schedule(task);
+
+            task.get(10, TimeUnit.SECONDS);
+            Assertions.fail("should fail");
+        } catch(Exception e)  {
+            Assertions.assertTrue(e.getCause() instanceof BlockingOperationError);
+        }
+    }
+
     // Project Reactor Essentials 15
     @Test
     void subscribeOnSimple() {
@@ -335,4 +363,97 @@ public class OperatorsTest {
             .verify();
     }
     //Project Reactor Essentials 22
+    @Test
+    void flatMapOperator() throws Exception {
+        Function<String, Flux<String>> myFunc = (String name) -> {
+            return name.equals("A") ? Flux.just("nameA1", "nameA2").delayElements(Duration.ofMillis(100)) : Flux.just("nameB1", "nameB2");
+        };
+
+        Flux<String> flux = Flux.just("a","b");
+        Flux<String> flatFlux = flux
+            .map(String::toUpperCase)
+            .flatMap(myFunc)
+            .log();
+
+            flatFlux.subscribe(s -> log.info(s));
+
+        Thread.sleep(1000);
+        StepVerifier
+            .create(flatFlux)
+            .expectSubscription()
+            .expectNext("nameB1", "nameB2", "nameA1", "nameA2")
+            .verifyComplete();
+
+    }
+
+    @Test
+    void flatMapSequentialOperator() throws Exception {
+        Function<String, Flux<String>> myFunc = (String name) -> {
+            return name.equals("A") ? Flux.just("nameA1", "nameA2").delayElements(Duration.ofMillis(100)) : Flux.just("nameB1", "nameB2");
+        };
+
+        Flux<String> flux = Flux.just("a","b");
+        Flux<String> flatFlux = flux
+            .map(String::toUpperCase)
+            .flatMapSequential(myFunc)
+            .log();
+
+            flatFlux.subscribe(s -> log.info(s));
+
+        Thread.sleep(1000);
+        StepVerifier
+            .create(flatFlux)
+            .expectSubscription()
+            .expectNext("nameA1", "nameA2", "nameB1", "nameB2")
+            .verifyComplete();
+
+    }
+
+    //Project Reactor Essentials 23
+    public record Anime(String title, String studio, int epsode) {}
+
+    @Test
+    void zipOperator() {
+        Flux<String> titleFlux = Flux.just("Grand Blue", "Baki");
+        Flux<String> studioFlux = Flux.just("Zero-G", "TMS Entertainment");
+        Flux<Integer> episodesFlux = Flux.just(12,24);
+
+
+        Flux<Anime> animeFlux = Flux.zip(titleFlux, studioFlux, episodesFlux)
+            .flatMap(t3 -> Flux.just(new Anime(t3.getT1(), t3.getT2(), t3.getT3())));
+
+        StepVerifier
+            .create(animeFlux)
+            .expectSubscription()
+            .expectNext(
+                new Anime("Grand Blue", "Zero-G", 12),
+                new Anime("Baki", "TMS Entertainment", 24)
+            )
+            .verifyComplete();
+    }
+
+    @Test
+    void zipOperatorWith() {
+        Flux<String> titleFlux = Flux.just("Grand Blue", "Baki");
+        Flux<String> studioFlux = Flux.just("Zero-G", "TMS Entertainment");
+        Flux<Integer> episodesFlux = Flux.just(12,24);
+
+
+        Flux<Anime> animeFlux = titleFlux.zipWith(studioFlux)
+            .flatMap(t2 -> Flux.just(new Anime(t2.getT1(), t2.getT2(), 0)));
+
+        animeFlux.subscribe(a -> log.info(a.toString()));
+
+        StepVerifier
+            .create(animeFlux)
+            .expectSubscription()
+            .expectNext(
+                new Anime("Grand Blue", "Zero-G", 0),
+                new Anime("Baki", "TMS Entertainment", 0)
+            )
+            .verifyComplete();
+    }
+
+    //Project Reactor Essentials 24
+
 }
